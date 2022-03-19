@@ -409,10 +409,13 @@ class Environ:
         # ===================================================
         actions = actions_ch_sel
         power_selection = self.fixed_v2v_power_index*np.ones([self.n_Veh, self.n_Neighbor], dtype='int32')
+        # print("Power selection Index: ")
+        # print(power_selection)
         V2I_Flag = True
-        Interference = np.zeros(self.n_RB)
+        Interference = np.zeros(self.n_RB)      # 1-D array of n_RB elements
         for i in range(len(self.vehicles)):
-            for j in range(len(actions[i, :])):
+            for j in range(len(actions[i, :])):     # j = 0 always, loop runs 1 time as length = 1
+                # print('j = ', j)
                 if not self.activate_links[i, j]:
                     continue
                 Interference[actions[i][j]] += 10**((self.V2V_power_dB_List[power_selection[i, j]]

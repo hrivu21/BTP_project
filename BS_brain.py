@@ -212,6 +212,7 @@ class BS:
         adam = keras.optimizers.Adam(lr=0.001, beta_1=0.5, beta_2=0.999)
         # Compile the model
         model.compile(optimizer=adam, loss=huber_loss)
+        model.summary()
 
         return model
 
@@ -305,11 +306,14 @@ class Agent:
         self.v2v_weight = curr_rl_config.v2v_weight
         self.v2i_weight = curr_rl_config.v2i_weight
 
+
+        self.print_flag = False
+
     def select_action_while_training(self, state):
         # according to current state, choose the proper action
         num_D2D = self.num_D2D
         num_neighbor = self.num_Neighbor
-        Action_Matrix = 100*np.ones((num_D2D, num_neighbor))
+        Action_Matrix = 100*np.ones((num_D2D, num_neighbor))        # shape = 4 x 1
         CH_Set = range(0, self.num_CH)
 
         # anneal Epsilon linearly from MAX_EPSILON to MIN_EPSILON
@@ -334,17 +338,23 @@ class Agent:
         else:
             # choose the action index which maximize the Q Function of each D2D
             Q_Pred = self.brain.predict_one_step(state, target=False)
+            if self.print_flag:
+                print("Q_Pred =", Q_Pred[0], Q_Pred[1], Q_Pred[2], Q_Pred[3], sep ='\n')
 
             D2D_Action = np.zeros((self.num_D2D, num_neighbor), int)
             # get the action for each D2D from each D2D's DQN
             for D_loop in range(self.num_D2D):
                 # use the current Q function to predict the max action
                 Action_Index = np.where(Q_Pred[D_loop][0] == np.max(Q_Pred[D_loop][0]))
-                if len(Action_Index) == 1:
+                if self.print_flag:
+                    print('------------------Action_Index = ', Action_Index)
+                # if len(Action_Index) == 1:
+                if len(Action_Index[0]) == 1:
                     D2D_Action[D_loop] = Action_Index[0][0]
                 else:
                     # when there are two actions leading to the same reward, we just choose one of them
-                    D2D_Action[D_loop] = Action_Index[0]
+                    # D2D_Action[D_loop] = Action_Index[0]
+                    D2D_Action[D_loop] = Action_Index[0][0]
                     print('While Training: Current Q Predict is', Q_Pred[D_loop][0], 'at the -', D_loop, '-D2D')
                     print('                Current Action is ', Action_Index)
             Action_Matrix = D2D_Action
@@ -506,7 +516,13 @@ class Agent:
                 # choose action via Epsilon-Greedy strategy
                 Train_D2D_Action_Matrix = self.select_action_while_training(States_train)
 
+            if self.print_flag:
+                print("Train_D2D_Action_Matrix  ", Train_D2D_Action_Matrix, sep='\n')
+
             Actions = np.reshape(Train_D2D_Action_Matrix, [1, -1])
+
+            if self.print_flag:
+                print("Actions  ", Actions, sep='\n')
 
             # Take action and Get Reward
             V2V_Rate, V2I_Rate, Interference = self.act(Train_D2D_Action_Matrix)
@@ -550,6 +566,10 @@ class Agent:
             # add the sample (or transition) to the Buffer
             self.train_observe(sample)
 
+        if self.print_flag:
+            print('Reward_Per_Transition')
+            print(Reward_Per_Transition)
+        
         return Reward_Per_Transition
 
     def replay(self):
@@ -747,7 +767,7 @@ class Agent:
 
         return Train_Result, Q_mean, Q_max_mean, Orig_Q_mean, Orig_Q_max_mean
 
-    def train(self, num_episodes, num_train_steps):
+    def train(self, num_episodes, num_train_steps, num_transition):
         # to train model
         self.num_Episodes = num_episodes
         self.num_Train_Step = num_train_steps
@@ -755,7 +775,7 @@ class Agent:
         GAMMA = self.gamma
         Num_D2D = self.num_D2D
         # make several transitions before each training
-        self.num_transition = 50
+        self.num_transition = num_transition
 
         # record the training loss
         Train_Loss = np.ones((Num_D2D, num_episodes, num_train_steps))
@@ -849,7 +869,7 @@ class Agent:
             Reward_Per_Episode[Episode_loop] = np.sum(Reward_Per_Train_Step[Episode_loop, :, :])
 
             # Save the model's weights of Q-Function Network and Target Network
-            if False and (Episode_loop + 1) % Save_Model_Interval == 0:
+            if (Episode_loop + 1) % Save_Model_Interval == 0:
 
                 # record the current episode index
                 Curr_Train_Episode = Episode_loop + 1
@@ -905,6 +925,7 @@ class Agent:
                              Reward_Per_Train_Step, Reward_Per_Episode), file_to_open)
                 file_to_open.close()
 
+        print('Reward_Per_Episode', Reward_Per_Episode, sep='\n')
         return Train_Loss,  Reward_Per_Train_Step, Reward_Per_Episode, \
                Train_Q_mean, Train_Q_max_mean, Orig_Train_Q_mean, Orig_Train_Q_max_mean
 

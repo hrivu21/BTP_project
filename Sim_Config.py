@@ -10,8 +10,9 @@ class RL_Config:
     def __init__(self):
         # key parameters for RL training process
         self.Num_Feedback = 16    # number of Compression Features for each D2D
-        self.Num_Episodes = 10 #10000     # number of episodes for training
-        self.Num_Train_Steps = 20   # number of steps in each Episode
+        self.Num_Episodes = 1000 #10000     # number of episodes for training
+        self.Num_Train_Steps = 10 #20   # number of steps in each Episode
+        self.Num_Transition = 25 #50
         self.Batch_Size = 256   # size of the mini-batch for replay
         self.Gamma = 0.2     # discount factor in RL
         self.Num_Run_Episodes = 10  # number of episodes for testing

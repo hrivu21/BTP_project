@@ -106,11 +106,12 @@ def run_train(Env, curr_RL_Config):
     BS_Agent = Agent(Num_d2d, Num_CH, Num_neighbor, Num_D2D_feedback, Env, curr_RL_Config)
     Num_Episodes = curr_RL_Config.Num_Episodes
     Num_Train_Step = curr_RL_Config.Num_Train_Steps
+    Num_Transition = curr_RL_Config.Num_Transition
 
     # get the train loss
     [Train_Loss,  Reward_Per_Train_Step, Reward_Per_Episode,
     Train_Q_mean, Train_Q_max_mean, Orig_Train_Q_mean, Orig_Train_Q_max_mean] \
-        = BS_Agent.train(Num_Episodes, Num_Train_Step)
+        = BS_Agent.train(Num_Episodes, Num_Train_Step, Num_Transition)
 
     return [Train_Loss,  Reward_Per_Train_Step, Reward_Per_Episode,
             Train_Q_mean, Train_Q_max_mean, Orig_Train_Q_mean, Orig_Train_Q_max_mean]
