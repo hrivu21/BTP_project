@@ -171,7 +171,7 @@ class BS:
         D4_output = keras.layers.concatenate([D4, D4_Agg])
 
         # implement Decision DNN for 1st D2D
-        Num_D2D_Decide_Output = self.num_CH
+        Num_D2D_Decide_Output = self.num_CH * 3
         D1_Decide_Input = keras.layers.concatenate([D1_Node_Input, D1_output], name='D1_Decide_Input')
         D1_Decide = Dense(80, activation='relu')(D1_Decide_Input)
         D1_Decide = Dense(40, activation='relu')(D1_Decide)
@@ -307,6 +307,7 @@ class Agent:
         self.v2i_weight = curr_rl_config.v2i_weight
 
 
+        self.num_V2V_power = len(environment.V2V_power_dB_List)
         self.print_flag = False
 
     def select_action_while_training(self, state):
@@ -315,6 +316,9 @@ class Agent:
         num_neighbor = self.num_Neighbor
         Action_Matrix = 100*np.ones((num_D2D, num_neighbor))        # shape = 4 x 1
         CH_Set = range(0, self.num_CH)
+
+        Power_Matrix = 100*np.ones((num_D2D, num_neighbor))        
+        Power_Set = range(0, self.num_V2V_power)
 
         # anneal Epsilon linearly from MAX_EPSILON to MIN_EPSILON
         Epsilon_decrease_percentage = 0.8
@@ -332,10 +336,13 @@ class Agent:
             print('Current Epsilon while Training is ', self.epsilon, ' Current Training Step is ', self.num_step)
 
         if np.random.random() < self.epsilon:
+            if self.print_flag: print('//////////////////////////   EXPLORATION   //////////////////////////')
             # generate action for each D2D randomly
             for D2D_loop in range(num_D2D):
                 Action_Matrix[D2D_loop, :] = np.random.choice(CH_Set, num_neighbor)
+                Power_Matrix[D2D_loop, :] = np.random.choice(Power_Set, num_neighbor)
         else:
+            if self.print_flag: print('++++++++++++++++++++++++++  EXPLOITATION   +++++++++++++++++++++++++++')
             # choose the action index which maximize the Q Function of each D2D
             Q_Pred = self.brain.predict_one_step(state, target=False)
             if self.print_flag:
@@ -345,21 +352,29 @@ class Agent:
             # get the action for each D2D from each D2D's DQN
             for D_loop in range(self.num_D2D):
                 # use the current Q function to predict the max action
-                Action_Index = np.where(Q_Pred[D_loop][0] == np.max(Q_Pred[D_loop][0]))
-                if self.print_flag:
-                    print('------------------Action_Index = ', Action_Index)
-                # if len(Action_Index) == 1:
-                if len(Action_Index[0]) == 1:
+                Action_Index = np.where(Q_Pred[D_loop][0] == np.max(Q_Pred[D_loop][0]))     # tuple of length  = 1
+
+                # if self.print_flag:
+                #     print('------------------Action_Index = ', Action_Index)
+
+                Action_Matrix[D_loop] = Action_Index[0][0] % self.num_D2D
+                Power_Matrix[D_loop] = Action_Index[0][0] // self.num_D2D
+
+                '''    
+                if len(Action_Index) == 1:
                     D2D_Action[D_loop] = Action_Index[0][0]
                 else:
                     # when there are two actions leading to the same reward, we just choose one of them
-                    # D2D_Action[D_loop] = Action_Index[0]
-                    D2D_Action[D_loop] = Action_Index[0][0]
+                    D2D_Action[D_loop] = Action_Index[0]
                     print('While Training: Current Q Predict is', Q_Pred[D_loop][0], 'at the -', D_loop, '-D2D')
                     print('                Current Action is ', Action_Index)
+                
             Action_Matrix = D2D_Action
+                
         # return Action_Matrix
-        return Action_Matrix.astype(np.int)
+        '''
+        # return Action_Matrix.astype(np.int)
+        return Action_Matrix.astype(np.int), Power_Matrix.astype(np.int)
 
     def select_action_random(self, state):
         # choose the action Randomly
@@ -378,7 +393,8 @@ class Agent:
         # update current time step
         self.num_step += 1
         # take actions and get reward
-        [V2V_Rate, V2I_Rate, Interference] = self.env.compute_reward_with_channel_selection(actions)
+        # [V2V_Rate, V2I_Rate, Interference] = self.env.compute_reward_with_channel_selection(actions)
+        [V2V_Rate, V2I_Rate, Interference] = self.env.compute_reward_with_channel_power_selection(actions)
         # update the state
         self.env.renew_positions()
         self.env.renew_channels_fastfading()
@@ -514,15 +530,16 @@ class Agent:
                                 }
 
                 # choose action via Epsilon-Greedy strategy
-                Train_D2D_Action_Matrix = self.select_action_while_training(States_train)
+                Train_D2D_Action_Matrix = self.select_action_while_training(States_train)       # tuple
 
             if self.print_flag:
-                print("Train_D2D_Action_Matrix  ", Train_D2D_Action_Matrix, sep='\n')
+                print("Channel Action Mat", Train_D2D_Action_Matrix[0], sep='\n')
+                print("Power Action Mat", Train_D2D_Action_Matrix[1], sep='\n')
 
             Actions = np.reshape(Train_D2D_Action_Matrix, [1, -1])
 
-            if self.print_flag:
-                print("Actions  ", Actions, sep='\n')
+            # if self.print_flag:
+            #     print("Actions  ", Actions, sep='\n')
 
             # Take action and Get Reward
             V2V_Rate, V2I_Rate, Interference = self.act(Train_D2D_Action_Matrix)
@@ -565,16 +582,14 @@ class Agent:
 
             # add the sample (or transition) to the Buffer
             self.train_observe(sample)
-
-        if self.print_flag:
-            print('Reward_Per_Transition')
-            print(Reward_Per_Transition)
         
         return Reward_Per_Transition
 
     def replay(self):
         # define the replay to generate training samples from Memory
-        Num_RL_Actions = self.num_Actions
+
+        # Num_RL_Actions = self.num_Actions
+        Num_RL_Actions = self.num_Actions * self.num_V2V_power
         Num_D2D = self.num_D2D
         Num_One_D2D_Input = self.brain.num_One_D2D_Input
         Num_One_Node_Input = self.brain.num_One_Node_Input
@@ -814,7 +829,16 @@ class Agent:
                        + '-Gamma-' + str(GAMMA) \
                        + '-V2Iweight-' + str(V2I_Weight)
 
-        folder = os.getcwd() + '\\' + curr_sim_set + '\\'
+        # folder = os.getcwd() + '\\' + curr_sim_set + '\\'
+
+        Curr_OS = os.name
+        if Curr_OS == 'nt':
+            print('Current OS is Windows！')
+            folder = os.getcwd() + '\\' + curr_sim_set + '\\'
+        else:
+            folder = os.getcwd() + '/' + curr_sim_set + '/'
+
+
         if not os.path.exists(folder):
             os.makedirs(folder)
             print('Create the new folder while training to save results : ')
@@ -824,6 +848,8 @@ class Agent:
 
         # main loop
         for Episode_loop in range(self.num_Episodes):
+
+            print(f'------------------------- Episode num = {Episode_loop}-------------------')
 
             # start a new game for each episode
             self.env.new_random_game(self.num_D2D)
@@ -844,6 +870,10 @@ class Agent:
 
                 # make several transitions then begin training
                 Reward_Per_Transition = self.generate_d2d_transition(self.num_transition)
+
+                if self.print_flag:
+                    print('Reward_Per_Transition')
+                    print(Reward_Per_Transition)
                 # record the reward per train step
                 Reward_Per_Train_Step[Episode_loop, Iteration_loop, :] = Reward_Per_Transition
 
@@ -925,7 +955,13 @@ class Agent:
                              Reward_Per_Train_Step, Reward_Per_Episode), file_to_open)
                 file_to_open.close()
 
+        print('Train_Loss', Train_Loss, sep='\n')
         print('Reward_Per_Episode', Reward_Per_Episode, sep='\n')
+        print('Train_Q_mean', Train_Q_mean, sep='\n')
+        print('Train_Q_max_mean', Train_Q_max_mean, sep='\n')
+        print('Orig_Train_Q_mean', Orig_Train_Q_mean, sep='\n')
+        print('Orig_Train_Q_max_mean', Orig_Train_Q_max_mean, sep='\n')
+
         return Train_Loss,  Reward_Per_Train_Step, Reward_Per_Episode, \
                Train_Q_mean, Train_Q_max_mean, Orig_Train_Q_mean, Orig_Train_Q_max_mean
 
@@ -1254,7 +1290,14 @@ class Agent:
                                    + '-Gamma-' + str(GAMMA) \
                                    + '-V2Iweight-' + str(V2I_Weight)
 
-                    folder = os.getcwd() + '\\' + curr_sim_set + '\\'
+                    # folder = os.getcwd() + '\\' + curr_sim_set + '\\'
+                    Curr_OS = os.name
+                    if Curr_OS == 'nt':
+                        print('Current OS is Windows！')
+                        folder = os.getcwd() + '\\' + curr_sim_set + '\\'
+                    else:
+                        folder = os.getcwd() + '/' + curr_sim_set + '/'
+
                     if not os.path.exists(folder):
                         os.makedirs(folder)
                         print('Create the new folder in Testing main ', folder)

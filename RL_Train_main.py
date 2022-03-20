@@ -154,7 +154,15 @@ def save_train_results(Train_Loss, Reward_Per_Train_Step, Reward_Per_Episode,
                    + '-Gamma-' + str(GAMMA) \
                    + '-V2Iweight-' + str(V2I_Weight)
 
-    folder = os.getcwd() + '\\' + curr_sim_set + '\\'
+    # folder = os.getcwd() + '\\' + curr_sim_set + '\\'
+
+    Curr_OS = os.name
+    if Curr_OS == 'nt':
+        print('Current OS is Windows！')
+        folder = os.getcwd() + '\\' + curr_sim_set + '\\'
+    else:
+        folder = os.getcwd() + '/' + curr_sim_set + '/'
+
     if not os.path.exists(folder):
         os.makedirs(folder)
         print('Create the new folder in train main ', folder)
@@ -173,9 +181,10 @@ def save_train_results(Train_Loss, Reward_Per_Train_Step, Reward_Per_Episode,
         plt.grid(True)
         plt.legend()
         Curr_OS = os.name
-        if Curr_OS == 'nt':
-            print('Current OS is Windows！')
-            Fig_Dir = curr_Result_Dir
+        # if Curr_OS == 'nt':
+        #     print('Current OS is Windows！')
+        #     Fig_Dir = curr_Result_Dir
+        Fig_Dir = curr_Result_Dir
 
         Fig_Name = 'D2D-' + str(D_loop) + '-th-Train-LOSS-' + '-Episode-' + str(Num_Episodes) + '-Step-' \
                    + str(Num_Train_Step) + '-Batch-' + str(Batch_Size) + '.png'
@@ -257,10 +266,13 @@ def save_train_results(Train_Loss, Reward_Per_Train_Step, Reward_Per_Episode,
     Fig_Para1 = Fig_Dir + Fig_Name1
     plt.savefig(Fig_Para1, dpi=600)
 
-    # save the results to file
-    if Curr_OS == 'nt':
-        # print('Current OS is Windows！')
-        Data_Dir = curr_Result_Dir
+    # # save the results to file
+    # if Curr_OS == 'nt':
+    #     # print('Current OS is Windows！')
+    #     Data_Dir = curr_Result_Dir
+
+    Data_Dir = curr_Result_Dir
+    
     Data_Name = 'Training-Result' + '-Episode-' + str(Num_Episodes) + '-Step-' + str(Num_Train_Step) \
                 + '-Batch-' + str(Batch_Size) + '.pkl'
     Data_Para = Data_Dir + Data_Name

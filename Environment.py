@@ -460,15 +460,68 @@ class Environ:
 
         return V2V_Rate, V2I_Rate, Interference
 
+    def compute_reward_with_channel_power_selection(self, actions_ch_power_sel):
+        actions, power_selection = actions_ch_power_sel
+        # power_selection = self.fixed_v2v_power_index*np.ones([self.n_Veh, self.n_Neighbor], dtype='int32')
+
+        V2I_Flag = True
+        Interference = np.zeros(self.n_RB)      # 1-D array of n_RB elements
+        for i in range(len(self.vehicles)):
+            for j in range(len(actions[i, :])):     # j = 0 always, loop runs 1 time as length = 1
+                # print('j = ', j)
+                if not self.activate_links[i, j]:
+                    continue
+                Interference[actions[i][j]] += 10**((self.V2V_power_dB_List[power_selection[i, j]]
+                                                     - self.V2I_channels_with_fastfading[i, actions[i, j]]
+                                                     + self.vehAntGain + self.bsAntGain - self.bsNoiseFigure)/10)
+        self.V2I_Interference = Interference + self.sig2
+        V2V_Interference = np.zeros((len(self.vehicles), self.n_Neighbor))
+        V2V_Signal = np.zeros((len(self.vehicles), self.n_Neighbor))
+        Interfence_times = np.zeros((len(self.vehicles), self.n_Neighbor))
+        actions[(np.logical_not(self.activate_links))] = -1
+        for i in range(self.n_RB):
+            indexes = np.argwhere(actions == i)
+            for j in range(len(indexes)):
+                receiver_j = self.vehicles[indexes[j, 0]].destinations[indexes[j, 1]]
+                V2V_Signal[indexes[j, 0], indexes[j, 1]] = 10**(
+                        (self.V2V_power_dB_List[power_selection[indexes[j, 0], indexes[j, 1]]]
+                            - self.V2V_channels_with_fastfading[indexes[j][0]][receiver_j][i]
+                            + 2*self.vehAntGain - self.vehNoiseFigure)/10)
+                if V2I_Flag:
+                    if i < self.n_Veh:
+                        V2V_Interference[indexes[j, 0], indexes[j, 1]] += 10**(
+                                (self.V2I_power_dB - self.V2V_channels_with_fastfading[i][receiver_j][i]
+                                    + 2*self.vehAntGain - self.vehNoiseFigure)/10)
+
+                for k in range(j+1, len(indexes)):
+                    receiver_k = self.vehicles[indexes[k][0]].destinations[indexes[k][1]]
+                    V2V_Interference[indexes[j, 0], indexes[j, 1]] += 10**(
+                            (self.V2V_power_dB_List[power_selection[indexes[k, 0], indexes[k, 1]]]
+                             - self.V2V_channels_with_fastfading[indexes[k][0]][receiver_j][i]
+                             + 2*self.vehAntGain - self.vehNoiseFigure)/10)
+                    V2V_Interference[indexes[k, 0], indexes[k, 1]] += 10**(
+                            (self.V2V_power_dB_List[power_selection[indexes[j, 0], indexes[j, 1]]]
+                             - self.V2V_channels_with_fastfading[indexes[j][0]][receiver_k][i]
+                             + 2*self.vehAntGain - self.vehNoiseFigure)/10)
+                    Interfence_times[indexes[j, 0], indexes[j, 1]] += 1
+                    Interfence_times[indexes[k, 0], indexes[k, 1]] += 1
+        self.V2V_Interference = V2V_Interference + self.sig2
+        V2V_Rate = np.log2(1 + np.divide(V2V_Signal, self.V2V_Interference))
+        V2I_Signals = self.V2I_power_dB - self.V2I_channels_abs[0:min(self.n_RB, self.n_Veh)] \
+                      + self.vehAntGain + self.bsAntGain - self.bsNoiseFigure
+        V2I_Rate = np.log2(1 + np.divide(10**(V2I_Signals/10), self.V2I_Interference[0:min(self.n_RB, self.n_Veh)]))
+        return V2V_Rate, V2I_Rate, Interference        
+
     def Compute_Interference(self, actions):
         # ====================================================
         # Compute the Interference to each channel_selection
         # ====================================================
         V2V_Interference = np.zeros((len(self.vehicles), self.n_Neighbor, self.n_RB)) + self.sig2
         V2I_Flag = True
-        if len(actions.shape) == 2:
-            channel_selection = actions.copy()
-            power_selection = self.fixed_v2v_power_index * np.ones([self.n_Veh, self.n_Neighbor], dtype='int32')
+        if len(actions[0].shape) == 2:
+            channel_selection = actions[0].copy()
+            # power_selection = self.fixed_v2v_power_index * np.ones([self.n_Veh, self.n_Neighbor], dtype='int32')
+            power_selection = actions[1]
             channel_selection[np.logical_not(self.activate_links)] = -1
 
             if V2I_Flag:
