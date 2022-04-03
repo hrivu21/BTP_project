@@ -461,7 +461,7 @@ class Environ:
         return V2V_Rate, V2I_Rate, Interference
 
     def compute_reward_with_channel_power_selection(self, actions_ch_power_sel):
-        actions, power_selection = actions_ch_power_sel
+        actions, power_selection = actions_ch_power_sel[0], actions_ch_power_sel[1]
         # power_selection = self.fixed_v2v_power_index*np.ones([self.n_Veh, self.n_Neighbor], dtype='int32')
 
         V2I_Flag = True

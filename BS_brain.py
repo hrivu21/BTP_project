@@ -1,6 +1,6 @@
 # implement the DQN and GNN in Each D2D
 # here we use D2D and V2V interchangeably
-
+import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 import keras
@@ -12,6 +12,7 @@ import datetime
 import os
 import random
 
+print_flag = False
 
 # Define GNN layer
 class GNNLayer(Layer):
@@ -212,7 +213,7 @@ class BS:
         adam = keras.optimizers.Adam(lr=0.001, beta_1=0.5, beta_2=0.999)
         # Compile the model
         model.compile(optimizer=adam, loss=huber_loss)
-        model.summary()
+        # model.summary()
 
         return model
 
@@ -308,9 +309,9 @@ class Agent:
 
 
         self.num_V2V_power = len(environment.V2V_power_dB_List)
-        self.print_flag = False
 
     def select_action_while_training(self, state):
+        is_random_action = False
         # according to current state, choose the proper action
         num_D2D = self.num_D2D
         num_neighbor = self.num_Neighbor
@@ -336,17 +337,21 @@ class Agent:
             print('Current Epsilon while Training is ', self.epsilon, ' Current Training Step is ', self.num_step)
 
         if np.random.random() < self.epsilon:
-            if self.print_flag: print('//////////////////////////   EXPLORATION   //////////////////////////')
+            is_random_action = True
+            if print_flag: print('//////////////////////////   EXPLORATION   //////////////////////////')
             # generate action for each D2D randomly
             for D2D_loop in range(num_D2D):
                 Action_Matrix[D2D_loop, :] = np.random.choice(CH_Set, num_neighbor)
                 Power_Matrix[D2D_loop, :] = np.random.choice(Power_Set, num_neighbor)
         else:
-            if self.print_flag: print('++++++++++++++++++++++++++  EXPLOITATION   +++++++++++++++++++++++++++')
+            is_random_action = False
+            if print_flag: print('++++++++++++++++++++++++++  EXPLOITATION   +++++++++++++++++++++++++++')
             # choose the action index which maximize the Q Function of each D2D
             Q_Pred = self.brain.predict_one_step(state, target=False)
-            if self.print_flag:
+            if print_flag:
                 print("Q_Pred =", Q_Pred[0], Q_Pred[1], Q_Pred[2], Q_Pred[3], sep ='\n')
+                # print("Q_Pred =", Q_Pred)
+                # print("Q_Pred shape = ", f'{len(Q_Pred)} x {len(Q_Pred[0])} x {len(Q_Pred[0][0])}')      # shape = 4 x 1 x 12
 
             D2D_Action = np.zeros((self.num_D2D, num_neighbor), int)
             # get the action for each D2D from each D2D's DQN
@@ -354,27 +359,27 @@ class Agent:
                 # use the current Q function to predict the max action
                 Action_Index = np.where(Q_Pred[D_loop][0] == np.max(Q_Pred[D_loop][0]))     # tuple of length  = 1
 
-                # if self.print_flag:
+                # if print_flag:
                 #     print('------------------Action_Index = ', Action_Index)
 
                 Action_Matrix[D_loop] = Action_Index[0][0] % self.num_D2D
                 Power_Matrix[D_loop] = Action_Index[0][0] // self.num_D2D
 
-                '''    
-                if len(Action_Index) == 1:
-                    D2D_Action[D_loop] = Action_Index[0][0]
-                else:
-                    # when there are two actions leading to the same reward, we just choose one of them
-                    D2D_Action[D_loop] = Action_Index[0]
-                    print('While Training: Current Q Predict is', Q_Pred[D_loop][0], 'at the -', D_loop, '-D2D')
-                    print('                Current Action is ', Action_Index)
+                    
+            #     if len(Action_Index) == 1:
+            #         D2D_Action[D_loop] = Action_Index[0][0]
+            #     else:
+            #         # when there are two actions leading to the same reward, we just choose one of them
+            #         D2D_Action[D_loop] = Action_Index[0]
+            #         print('While Training: Current Q Predict is', Q_Pred[D_loop][0], 'at the -', D_loop, '-D2D')
+            #         print('                Current Action is ', Action_Index)
                 
-            Action_Matrix = D2D_Action
+            # Action_Matrix = D2D_Action
                 
         # return Action_Matrix
-        '''
         # return Action_Matrix.astype(np.int)
-        return Action_Matrix.astype(np.int), Power_Matrix.astype(np.int)
+        # return Action_Matrix.astype(np.int), Power_Matrix.astype(np.int)
+        return ( Action_Matrix.astype(np.int), Power_Matrix.astype(np.int) ), is_random_action
 
     def select_action_random(self, state):
         # choose the action Randomly
@@ -453,6 +458,9 @@ class Agent:
         # normalize rate for V2V rate if necessary
         V2V_Rate_max = 1
 
+        exploration_count = 0
+        exploitation_count = 0
+
         # generate num_transitions of transitions
         for self.train_step in range(num_transitions):
             # initialize temp variables
@@ -530,16 +538,22 @@ class Agent:
                                 }
 
                 # choose action via Epsilon-Greedy strategy
-                Train_D2D_Action_Matrix = self.select_action_while_training(States_train)       # tuple
+                # Train_D2D_Action_Matrix = self.select_action_while_training(States_train)       # tuple
+                Train_D2D_Action_Matrix, explore_action = self.select_action_while_training(States_train)       # tuple
 
-            if self.print_flag:
+            if print_flag:
                 print("Channel Action Mat", Train_D2D_Action_Matrix[0], sep='\n')
                 print("Power Action Mat", Train_D2D_Action_Matrix[1], sep='\n')
 
+            if explore_action:
+                exploration_count += 1
+            else:
+                exploitation_count += 1
+
             Actions = np.reshape(Train_D2D_Action_Matrix, [1, -1])
 
-            # if self.print_flag:
-            #     print("Actions  ", Actions, sep='\n')
+            if print_flag:
+                print("Actions  ", Actions, sep='\n')       # shape = 1 x 12
 
             # Take action and Get Reward
             V2V_Rate, V2I_Rate, Interference = self.act(Train_D2D_Action_Matrix)
@@ -583,7 +597,8 @@ class Agent:
             # add the sample (or transition) to the Buffer
             self.train_observe(sample)
         
-        return Reward_Per_Transition
+        # return Reward_Per_Transition
+        return Reward_Per_Transition, exploration_count, exploitation_count
 
     def replay(self):
         # define the replay to generate training samples from Memory
@@ -792,6 +807,8 @@ class Agent:
         # make several transitions before each training
         self.num_transition = num_transition
 
+        # plt.axis([0, self.num_Episodes, 0, 50000])
+
         # record the training loss
         Train_Loss = np.ones((Num_D2D, num_episodes, num_train_steps))
         # record the change of Target Q function  -- Y
@@ -804,6 +821,9 @@ class Agent:
         # record the reward per episode
         Reward_Per_Episode = np.zeros(num_episodes)
         Reward_Per_Train_Step = np.zeros((num_episodes, num_train_steps, self.num_transition))
+
+        Explore_cnt = np.zeros(num_episodes)
+        Exploit_cnt = np.zeros(num_episodes)
 
         # track the simulation settings
         current_datetime = datetime.datetime.now()
@@ -848,6 +868,7 @@ class Agent:
 
         # main loop
         for Episode_loop in range(self.num_Episodes):
+            tot_explore_cnt, tot_exploit_cnt = 0, 0
 
             print(f'------------------------- Episode num = {Episode_loop}-------------------')
 
@@ -869,9 +890,12 @@ class Agent:
                     print('Current Training Step: ', Iteration_loop + 1, ' / Total Training Steps:', self.num_Train_Step)
 
                 # make several transitions then begin training
-                Reward_Per_Transition = self.generate_d2d_transition(self.num_transition)
+                # Reward_Per_Transition = self.generate_d2d_transition(self.num_transition)
+                Reward_Per_Transition, explore_cnt, exploit_cnt = self.generate_d2d_transition(self.num_transition)
+                tot_explore_cnt += explore_cnt
+                tot_exploit_cnt += exploit_cnt
 
-                if self.print_flag:
+                if print_flag:
                     print('Reward_Per_Transition')
                     print(Reward_Per_Transition)
                 # record the reward per train step
@@ -897,6 +921,24 @@ class Agent:
 
             # compute the total reward for each episode
             Reward_Per_Episode[Episode_loop] = np.sum(Reward_Per_Train_Step[Episode_loop, :, :])
+
+            ############################################################################################
+            Explore_cnt[Episode_loop] = tot_explore_cnt
+            Exploit_cnt[Episode_loop] = tot_exploit_cnt
+
+            print(f'Reward for episode = {Reward_Per_Episode[Episode_loop]}')
+            print('Explore count in Episode = ', Explore_cnt[Episode_loop])
+            print('Exploit count in Episode = ', Exploit_cnt[Episode_loop])
+
+            # plt.scatter(Episode_loop, Reward_Per_Episode[Episode_loop])
+            # plt.pause(0.0001)
+
+            # print('Train loss:')
+            # for D_loop in range(Num_D2D):
+            #     print(f'D2D {D_loop}: ', \
+            #             np.sum(Train_Loss[D_loop, Episode_loop, :]) / num_train_steps, sep='\n')
+            ############################################################################################
+
 
             # Save the model's weights of Q-Function Network and Target Network
             if (Episode_loop + 1) % Save_Model_Interval == 0:
@@ -955,6 +997,14 @@ class Agent:
                              Reward_Per_Train_Step, Reward_Per_Episode), file_to_open)
                 file_to_open.close()
 
+            else:
+                pass
+                # print('Train loss:')
+                # for D_loop in range(Num_D2D):
+                #     print(f'D2D {D_loop}: ', \
+                #             np.sum(Train_Loss[D_loop, Episode_loop, :], axis=1) / num_train_steps, sep='\n')
+
+        # plt.show()
         print('Train_Loss', Train_Loss, sep='\n')
         print('Reward_Per_Episode', Reward_Per_Episode, sep='\n')
         print('Train_Q_mean', Train_Q_mean, sep='\n')
