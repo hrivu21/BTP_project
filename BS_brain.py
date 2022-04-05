@@ -845,9 +845,18 @@ class Agent:
         Save_Model_Interval = num_episodes
 
         # save results in their corresponding simulation parameter settings
+        # curr_sim_set = 'Train-Result' + '-RealFB-' + str(self.num_Feedback) + '-Batch-' + str(BATCH_SIZE) \
+        #                + '-Gamma-' + str(GAMMA) \
+        #                + '-V2Iweight-' + str(V2I_Weight)
+
+        dt = datetime.datetime.now()
         curr_sim_set = 'Train-Result' + '-RealFB-' + str(self.num_Feedback) + '-Batch-' + str(BATCH_SIZE) \
-                       + '-Gamma-' + str(GAMMA) \
-                       + '-V2Iweight-' + str(V2I_Weight)
+                    + '-Gamma-' + str(GAMMA) \
+                    + '-V2Iweight-' + str(V2I_Weight) \
+                    + '-Episodes-' + str(num_episodes) \
+                    + '-Train_Steps-' + str(num_train_steps) \
+                    + '-Transitions-' + str(num_transition)  \
+                    + '-date-' + str(dt).split()[0] + f'--{dt.hour}-{dt.minute}-{dt.second}'
 
         # folder = os.getcwd() + '\\' + curr_sim_set + '\\'
 
@@ -927,16 +936,17 @@ class Agent:
             Exploit_cnt[Episode_loop] = tot_exploit_cnt
 
             print(f'Reward for episode = {Reward_Per_Episode[Episode_loop]}')
-            print('Explore count in Episode = ', Explore_cnt[Episode_loop])
-            print('Exploit count in Episode = ', Exploit_cnt[Episode_loop])
+            print(Explore_cnt[Episode_loop], Exploit_cnt[Episode_loop])
+            # print('Explore count in Episode = ', Explore_cnt[Episode_loop])
+            # print('Exploit count in Episode = ', Exploit_cnt[Episode_loop])
 
             # plt.scatter(Episode_loop, Reward_Per_Episode[Episode_loop])
             # plt.pause(0.0001)
 
-            # print('Train loss:')
-            # for D_loop in range(Num_D2D):
-            #     print(f'D2D {D_loop}: ', \
-            #             np.sum(Train_Loss[D_loop, Episode_loop, :]) / num_train_steps, sep='\n')
+            print('Train loss:')
+            for D_loop in range(Num_D2D):
+                print(f'D2D {D_loop}: ', \
+                        np.sum(Train_Loss[D_loop, Episode_loop, :]) / num_train_steps, sep='\n')
             ############################################################################################
 
 
@@ -1005,12 +1015,12 @@ class Agent:
                 #             np.sum(Train_Loss[D_loop, Episode_loop, :], axis=1) / num_train_steps, sep='\n')
 
         # plt.show()
-        print('Train_Loss', Train_Loss, sep='\n')
-        print('Reward_Per_Episode', Reward_Per_Episode, sep='\n')
-        print('Train_Q_mean', Train_Q_mean, sep='\n')
-        print('Train_Q_max_mean', Train_Q_max_mean, sep='\n')
-        print('Orig_Train_Q_mean', Orig_Train_Q_mean, sep='\n')
-        print('Orig_Train_Q_max_mean', Orig_Train_Q_max_mean, sep='\n')
+        # print('Train_Loss', Train_Loss, sep='\n')
+        # print('Reward_Per_Episode', Reward_Per_Episode, sep='\n')
+        # print('Train_Q_mean', Train_Q_mean, sep='\n')
+        # print('Train_Q_max_mean', Train_Q_max_mean, sep='\n')
+        # print('Orig_Train_Q_mean', Orig_Train_Q_mean, sep='\n')
+        # print('Orig_Train_Q_max_mean', Orig_Train_Q_max_mean, sep='\n')
 
         return Train_Loss,  Reward_Per_Train_Step, Reward_Per_Episode, \
                Train_Q_mean, Train_Q_max_mean, Orig_Train_Q_mean, Orig_Train_Q_max_mean

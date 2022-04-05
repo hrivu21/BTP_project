@@ -1,7 +1,7 @@
 # implement the Training main function
 from silence_tensorflow import silence_tensorflow
 silence_tensorflow()
-
+import datetime
 import matplotlib.pyplot as plt
 from BS_brain import Agent
 from Environment import *
@@ -64,7 +64,7 @@ def main():
         Env = start_env()
 
         # run the training process
-        [Train_Loss,  Reward_Per_Train_Step, Reward_Per_Episode,
+        [Train_Loss, Reward_Per_Train_Step, Reward_Per_Episode,
         Train_Q_mean, Train_Q_max_mean, Orig_Train_Q_mean, Orig_Train_Q_max_mean] \
             = run_train(Env, curr_RL_Config)
 
@@ -106,7 +106,7 @@ def run_train(Env, curr_RL_Config):
     BS_Agent = Agent(Num_d2d, Num_CH, Num_neighbor, Num_D2D_feedback, Env, curr_RL_Config)
     Num_Episodes = curr_RL_Config.Num_Episodes
     Num_Train_Step = curr_RL_Config.Num_Train_Steps
-    Num_Transition = curr_RL_Config.Num_Transition
+    Num_Transition = curr_RL_Config.Num_Transitions
 
     # get the train loss
     [Train_Loss,  Reward_Per_Train_Step, Reward_Per_Episode,
@@ -150,10 +150,15 @@ def save_train_results(Train_Loss, Reward_Per_Train_Step, Reward_Per_Episode,
         Orig_Train_Q_max_mean_per_Episode[D_loop, :] = np.sum(Orig_Train_Q_max_mean[D_loop, :, :], axis=1) / Num_Train_Step
 
     # save results in their corresponding simulation parameter settings
+    dt = datetime.datetime.now()
     curr_sim_set = 'Train-Result' + '-RealFB-' + str(Num_D2D_feedback) + '-Batch-' + str(Batch_Size) \
-                   + '-Gamma-' + str(GAMMA) \
-                   + '-V2Iweight-' + str(V2I_Weight)
-
+                    + '-Gamma-' + str(GAMMA) \
+                    + '-V2Iweight-' + str(V2I_Weight) \
+                    + '-Episodes-' + str(curr_rl_config.Num_Episodes) \
+                    + '-Train_Steps-' + str(curr_rl_config.Num_Train_Steps) \
+                    + '-Transitions-' + str(curr_rl_config.Num_Transitions)  \
+                    + '-date-' + str(dt).split()[0] + f'--{dt.hour}-{dt.minute}-{dt.second}'
+                    
     # folder = os.getcwd() + '\\' + curr_sim_set + '\\'
 
     Curr_OS = os.name
@@ -287,6 +292,22 @@ def save_train_results(Train_Loss, Reward_Per_Train_Step, Reward_Per_Episode,
                  Orig_Train_Q_mean_per_Episode, Orig_Train_Q_max_mean_per_Episode,
                  Reward_Per_Train_Step, Reward_Per_Episode), file_to_open)
     file_to_open.close()
+
+    # Data_parameters = Data_Dir + Data_Name + '.txt'
+    # with open(Data_parameters, 'w') as f:
+    #     data = 'Train_Loss_per_Episode = \n' + str(Train_Loss_per_Episode) + '\n\n' \
+    #             + 'Reward_Per_Episode = \n' + str(Reward_Per_Episode) + '\n\n' \
+    #             + 'Train_Q_mean_per_Episode = \n' + str(Train_Q_mean_per_Episode) + '\n\n' \
+    #             + 'Train_Q_max_mean_per_Episode = \n' + str(Train_Q_max_mean_per_Episode) + '\n\n' \
+    #             + 'Orig_Train_Q_mean_per_Episode = \n' + str(Orig_Train_Q_mean_per_Episode) + '\n\n' \
+    #             + 'Orig_Train_Q_max_mean_per_Episode = \n' + str(Orig_Train_Q_max_mean_per_Episode) + '\n\n'  \
+    #             + 'Train_Loss = \n' + str(Train_Loss) + '\n\n' \
+    #             + 'Train_Q_mean = \n' + str(Train_Q_mean) + '\n\n' \
+    #             + 'Train_Q_max_mean = \n' + str(Train_Q_max_mean) + '\n\n' \
+    #             + 'Orig_Train_Q_mean = \n' + str(Orig_Train_Q_mean) + '\n\n' \
+    #             + 'Orig_Train_Q_max_mean = \n' + str(Orig_Train_Q_max_mean) + '\n\n' \
+    #             + 'Reward_Per_Train_Step = \n' + str(Reward_Per_Train_Step) + '\n\n' 
+    #     f.write(data)
 
     save_flag = True
 
